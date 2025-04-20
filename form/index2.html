@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <style>
+        #banner-message {
+            display: none;
+            color: red;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        #ajax-log {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f8f8f8;
+            display: none;
+        }
+        .field-error {
+            border: solid 1px red;
+            border-radius: 3px;
+        }
+        .err-msg {
+            display: inline-block;
+            font-size: .8rem;
+            color: red;
+        }
+        /* .err-msg::before {
+            content: '!!';
+            font-size: .8rem;
+        } */
+    </style>
+
+</head>
+<body>
+    <div class="insert-form">
+        <label for="usr-name">이름</label>
+        <input type="text"id="form-text-1" placeholder="이름을 입력하세요" name="usr-name">
+        <div class="err-msg"><span></span></div>
+    </div>
+
+    <div class="insert-form">
+        <label for="usr-phone">전화번호</label>
+        <input type="number" id="form-phone" placeholder="전화번호를 입력하세요" name="usr-phone">
+        <div class="err-msg"><span></span></div>
+    </div>
+
+    <div class="insert-form">
+        <label for="gender">성별</label>
+        <input type="radio" name="gender" id="form-gender" value="M">남성
+        <input type="radio" name="gender" id="form-gender" value="F">여성
+        <div class="err-msg"><span></span></div>
+    </div>
+
+    <div class="insert-form">
+        <label for="grade">최종학력</label>
+        <select name="grade" id="form-grade-2">
+            <option value="">선택</option>
+            <option value="middle">중졸</option>
+            <option value="high">고졸</option>
+            <option value="univ_half">초대졸</option>
+            <option value="unif_full">대졸</option>
+        </select>
+        <div class="err-msg"><span></span></div>
+    </div>
+
+
+    <div id="button-container">
+        <button>요청 보내기</button>
+    </div>
+
+    <div id="banner-message">
+        <h1>jQuery에서 숨깁니다.</h1>
+    </div>
+
+    <div id="ajax-log">
+        <h3>Ajax 요청 로그</h3>
+        <pre id="request-data"></pre>
+        <button id="mock-success">성공 응답 시뮬레이션</button>
+        <button id="mock-error">오류 응답 시뮬레이션</button>
+    </div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4=" crossorigin="anonymous"></script>
+<script>
+    let hiddenBox = $("#banner-message");
+    let originalAjax = $.ajax;
+    let lastAjaxRequest = '';
+
+    $('input[name=usr-name]').attr('maxlength', 50);
+
+    $('input[name="usr-name"]').on('blur', function(e){
+        let $this = $(this);
+        var name = $this.val();
+
+        var ibyte= 0;
+        for (var k = 0; k < name.length; k++) {
+            if(escape(name.charAt(k)).length > 4) {
+                ibyte = ibyte + 2;
+            } else {
+                ibyte++;
+            }
+        }
+        let len = name.length;
+        let hangul_check = true;
+        for (var i = 0; i < len; i++) {
+            if (!((name.charCodeAt(i) > 0x3130 && name.charCodeAt(i) < 0x318f) || (name.charCodeAt(i) >= 0xAC00 && name.charCodeAt(i) <= 0xD7A3))) {
+                hangul_check = false;
+                break;
+            }
+        }
+
+        let eng_check = /^[a-zA-Z]+$/g;
+        
+        if (name.length == 0) {
+            $this.parent().find('.err-msg span').text('이름을 입력하세요.');
+            $this.addClass('field-error');
+        } else if ((hangul_check && ibyte < 4) || (eng_check && ibyte < 2)) {
+            $this.parent().find('.err-msg span').text('이름은 2글자 이상 입력하세요.');
+            $this.addClass('field-error');
+        } else if (!hangul_check && !eng_check.test(name)) {
+            $this.parent().find('.err-msg span').text('이름은 한글이나 영어로 입력하세요.');
+            $this.addClass('field-error');
+        } else {
+            $this.parent().find('.err-msg span').text('');
+            $this.removeClass('field-error');
+        }
+        return true;
+    });
+
+    $('select[name="grade"]').on('click', function() {
+        let $this = $(this);
+        var name = $this.val();
+        
+        if(name == "") {
+            $this.parent().find('.err-msg span').text('최종학력을 선택하세요');
+            $this.addClass('field-error');
+        } else {
+            $this.parent().find('.err-msg span').text('');
+            $this.removeClass('field-error');
+        }
+        return true;
+    });
+
+    // 페이지 로드 시 최종학력 초기 체크
+    $('select[name="grade"]').on('change', function() {
+        let $this = $(this);
+        var val = $this.val();
+        
+        if(val == "") {
+            $this.parent().find('.err-msg span').text('최종학력을 선택하세요');
+            $this.addClass('field-error');
+        } else {
+            $this.parent().find('.err-msg span').text('');
+            $this.removeClass('field-error');
+        }
+    });
+
+    
+    // Ajax 요청을 가로채는 함수
+    $.ajax = function(options) {
+        if ($('input[name="usr-name"]').val()=="") {
+            alert("이름을 입력해주세요.");
+            $('input[name="usr-name"]').focus();
+            return;
+        }
+        if ($('select[name="grade"]').val() == "") {
+            alert("최종학력을 선택해주세요.");
+            $('select[name="grade"]').focus();
+            return;
+        }
+
+        lastAjaxRequest = options;
+        
+        // 요청 데이터를 화면에 표시
+        $("#ajax-log").show();
+        $("#request-data").html(
+            "URL: " + options.url + "\n" +
+            "Type: " + options.type + "\n" +
+            "Data: " + options.data
+        );
+        
+        // 실제 Ajax 요청은 실행하지 않고 여기서 중단
+        console.log("Ajax 요청이 가로채어졌습니다:", options);
+        return { abort: function() {} };
+    };
+    
+    // 성공 응답 시뮬레이션 버튼
+    $("#mock-success").on("click", function() {
+        if (lastAjaxRequest && lastAjaxRequest.success) {
+            const mockResponse = {
+                rsCd: '1',
+                data: {
+                    chk: 1 // 1로 설정하면 hiddenBox가 표시됨
+                }
+            };
+            lastAjaxRequest.success(JSON.stringify(mockResponse));
+        }
+    });
+    
+    // 오류 응답 시뮬레이션 버튼
+    $("#mock-error").on("click", function() {
+        if (lastAjaxRequest && lastAjaxRequest.error) {
+            lastAjaxRequest.error(null, "error", "모의 오류 발생");
+        }
+    });
+
+    $("#button-container button").on("click", function(event) {
+        ajaxStart();
+    });
+
+    function ajaxStart() {
+        const data = {
+            key: "KCT0205",
+            name: $('input[name="usr-name"]').val(),
+            grade: $('select[name="grade"]').val(),
+        }
+        
+        const url = "/ajax-data";
+        $.ajax({
+            url: url,
+            type: 'POST',
+            dataType: "text",
+            data: JSON.stringify(data),
+            success: function(json){
+                const jsonData = $.parseJSON(json);
+                if(jsonData.rsCd=='1'){
+                    chk = jsonData.data.chk;
+                    if(chk == -999) {
+                        alert("hello");
+                    } else {
+                        hiddenBox.show();
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("Ajax 요청 실패:", error);
+                alert("서버 요청에 실패했습니다.");
+            }
+        });
+    }
+</script>
+</body>
+</html>
